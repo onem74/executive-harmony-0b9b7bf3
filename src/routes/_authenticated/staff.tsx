@@ -90,7 +90,7 @@ function StaffPage() {
     };
   }, []);
 
-  async function setResStatus(id: string, status: Reservation["status"]) {
+  async function setResStatus(id: string, status: "pending" | "confirmed" | "seated" | "completed" | "cancelled") {
     const { error } = await supabase.from("reservations").update({ status }).eq("id", id);
     if (error) setNotice(error.message);
   }
@@ -211,7 +211,7 @@ function StaffPage() {
                   ))}
                 </ul>
                 <div className="flex gap-1">
-                  {["preparing", "served", "paid"].map((s) => (
+                  {(["preparing", "served", "paid"] as const).map((s) => (
                     <ActionBtn key={s} onClick={async () => {
                       await supabase.from("orders").update({ status: s }).eq("id", o.id);
                     }}>{s}</ActionBtn>
