@@ -667,34 +667,6 @@ function Field({
   );
 }
 
-function Select({
-  label,
-  name,
-  options,
-}: {
-  label: string;
-  name: string;
-  options: string[];
-}) {
-  return (
-    <div>
-      <label className="mb-2 block text-[10px] font-medium uppercase tracking-[0.28em] text-gold/70">
-        {label}
-      </label>
-      <select
-        name={name}
-        className="w-full border-b border-white/10 bg-transparent py-3 text-sm text-ivory focus:border-gold focus:outline-none"
-      >
-        {options.map((o) => (
-          <option key={o} value={o} className="bg-obsidian text-ivory">
-            {o}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 function Footer() {
   return (
     <footer className="border-t border-gold/10 bg-obsidian py-20">
