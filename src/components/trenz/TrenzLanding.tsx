@@ -1,16 +1,20 @@
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
+import { useI18n } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/trenz/LanguageSwitcher";
 import logo from "@/assets/trenz-logo.png.asset.json";
 import hero from "@/assets/trenz-hero.png.asset.json";
 import roomBlue from "@/assets/room-blue.png.asset.json";
 import roomDiamond from "@/assets/room-diamond.png.asset.json";
 import corridor from "@/assets/corridor.png.asset.json";
 
-const NAV_LINKS = [
-  { label: "Suites", href: "#suites" },
-  { label: "Karaoke", href: "#karaoke" },
-  { label: "Bar", href: "#bar" },
-  { label: "Membership", href: "#membership" },
-  { label: "Reserve", href: "#reserve" },
+const NAV_LINKS: { key: string; href: string; to?: string }[] = [
+  { key: "nav.suites", href: "#suites" },
+  { key: "nav.menu", href: "", to: "/menu" },
+  { key: "nav.rooms", href: "", to: "/rooms" },
+  { key: "nav.membership", href: "#membership" },
+  { key: "nav.reserve", href: "#reserve" },
 ];
 
 const SUITES = [
@@ -128,6 +132,7 @@ export function TrenzLanding() {
 }
 
 function Nav({ scrolled }: { scrolled: boolean }) {
+  const { t } = useI18n();
   return (
     <nav
       className={`fixed top-0 z-50 w-full px-6 md:px-10 transition-all duration-500 ${
@@ -142,22 +147,41 @@ function Nav({ scrolled }: { scrolled: boolean }) {
           <span className="font-serif text-lg tracking-[0.4em] text-gold">TRENZ</span>
         </a>
         <div className="hidden items-center gap-9 md:flex">
-          {NAV_LINKS.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              className="text-[11px] font-medium uppercase tracking-[0.28em] text-ivory/75 transition-colors hover:text-gold"
-            >
-              {l.label}
-            </a>
-          ))}
+          {NAV_LINKS.map((l) =>
+            l.to ? (
+              <Link
+                key={l.key}
+                to={l.to}
+                className="text-[11px] font-medium uppercase tracking-[0.28em] text-ivory/75 transition-colors hover:text-gold"
+              >
+                {t(l.key)}
+              </Link>
+            ) : (
+              <a
+                key={l.key}
+                href={l.href}
+                className="text-[11px] font-medium uppercase tracking-[0.28em] text-ivory/75 transition-colors hover:text-gold"
+              >
+                {t(l.key)}
+              </a>
+            ),
+          )}
         </div>
-        <a
-          href="#reserve"
-          className="hidden border border-gold/50 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.3em] text-gold transition-colors hover:bg-gold hover:text-night md:inline-block"
-        >
-          Request Entry
-        </a>
+        <div className="flex items-center gap-3">
+          <LanguageSwitcher />
+          <Link
+            to="/auth"
+            className="hidden border border-gold/30 px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-ivory/70 transition-colors hover:border-gold hover:text-gold md:inline-block"
+          >
+            {t("nav.signin")}
+          </Link>
+          <a
+            href="#reserve"
+            className="hidden border border-gold/50 px-5 py-2.5 text-[10px] font-semibold uppercase tracking-[0.3em] text-gold transition-colors hover:bg-gold hover:text-night md:inline-block"
+          >
+            {t("cta.request")}
+          </a>
+        </div>
       </div>
     </nav>
   );
@@ -493,7 +517,54 @@ function Membership() {
 }
 
 function Reserve() {
-  const [state, setState] = useState<"idle" | "sent">("idle");
+  const { t } = useI18n();
+  const [state, setState] = useState<"idle" | "sent" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [rooms, setRooms] = useState<{ id: string; name: string; tier: string; capacity: number }[]>([]);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    date: "",
+    start: "20:00",
+    end: "22:00",
+    party: 4,
+    room_id: "",
+    notes: "",
+  });
+
+  useEffect(() => {
+    supabase
+      .from("rooms")
+      .select("id,name,tier,capacity")
+      .eq("is_active", true)
+      .order("sort_order")
+      .then(({ data }) => setRooms(data ?? []));
+  }, []);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setErrorMsg(null);
+    const { error } = await supabase.from("reservations").insert({
+      room_id: form.room_id || null,
+      guest_name: form.name,
+      guest_email: form.email,
+      guest_phone: form.phone || null,
+      party_size: form.party,
+      reservation_date: form.date,
+      start_time: form.start,
+      end_time: form.end,
+      notes: form.notes || null,
+      status: "pending",
+    });
+    if (error) {
+      setErrorMsg(error.message.includes("ROOM_CONFLICT") ? t("reserve.conflict") : t("reserve.error"));
+      setState("error");
+      return;
+    }
+    setState("sent");
+  }
+
   return (
     <section id="reserve" className="relative overflow-hidden py-32 md:py-40">
       <img
@@ -506,8 +577,8 @@ function Reserve() {
       <div className="relative mx-auto max-w-3xl px-6">
         <div className="border border-gold/25 bg-obsidian/85 p-8 backdrop-blur md:p-14">
           <div className="mb-12 text-center">
-            <span className="eyebrow mb-6 block">Reservations</span>
-            <h2 className="font-serif text-4xl md:text-5xl">Secure your evening.</h2>
+            <span className="eyebrow mb-6 block">{t("nav.reserve")}</span>
+            <h2 className="font-serif text-4xl md:text-5xl">{t("reserve.title")}</h2>
             <p className="mx-auto mt-4 max-w-md text-sm text-ivory/55">
               Same-day and parties larger than 30 — please reach our concierge
               directly at{" "}
@@ -523,53 +594,53 @@ function Reserve() {
               <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full border border-gold/40 text-2xl text-gold">
                 ✓
               </div>
-              <h3 className="mb-2 font-serif text-2xl">Request received.</h3>
-              <p className="mx-auto max-w-sm text-sm text-ivory/60">
-                Our concierge will confirm your suite within the hour.
-              </p>
+              <h3 className="mb-2 font-serif text-2xl">{t("reserve.success")}</h3>
             </div>
           ) : (
-            <form
-              className="grid gap-8 md:grid-cols-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                setState("sent");
-              }}
-            >
-              <Field label="Full name" placeholder="Alexander Chen" name="name" required />
-              <Field label="Contact" placeholder="+62 812 3456 7890" name="phone" required />
-              <Field label="Date" type="date" name="date" required />
-              <Field label="Arrival" type="time" name="time" required />
-              <Select
-                label="Suite tier"
-                name="tier"
-                options={[
-                  "The Executive Standard",
-                  "The Cognac Parlour · VIP",
-                  "The Obsidian · VVIP",
-                  "The Director's Suite",
-                ]}
-              />
-              <Select
-                label="Party size"
-                name="party"
-                options={["2 – 4 guests", "5 – 8 guests", "9 – 12 guests", "13 – 20 guests"]}
-              />
+            <form className="grid gap-8 md:grid-cols-2" onSubmit={submit}>
+              <Field label={t("reserve.name")} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <Field label={t("reserve.email")} type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <Field label={t("reserve.phone")} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              <Field label={t("reserve.party")} type="number" min={1} required value={String(form.party)} onChange={(e) => setForm({ ...form, party: Number(e.target.value) })} />
+              <Field label={t("reserve.date")} type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+              <div className="grid grid-cols-2 gap-4">
+                <Field label={t("reserve.start")} type="time" required value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} />
+                <Field label={t("reserve.end")} type="time" required value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} />
+              </div>
               <div className="md:col-span-2">
                 <label className="mb-2 block text-[10px] font-medium uppercase tracking-[0.28em] text-gold/70">
-                  Requests
+                  {t("reserve.room")}
+                </label>
+                <select
+                  value={form.room_id}
+                  onChange={(e) => setForm({ ...form, room_id: e.target.value })}
+                  className="w-full border-b border-white/10 bg-transparent py-3 text-sm text-ivory focus:border-gold focus:outline-none"
+                >
+                  <option value="" className="bg-obsidian">— Any / concierge picks —</option>
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id} className="bg-obsidian">
+                      {r.name} · {r.tier.toUpperCase()} · seats {r.capacity}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-[10px] font-medium uppercase tracking-[0.28em] text-gold/70">
+                  {t("reserve.notes")}
                 </label>
                 <textarea
                   rows={3}
-                  placeholder="Pre-order bottle service, dietary notes, occasion…"
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
                   className="w-full resize-none border-b border-white/10 bg-transparent py-3 text-sm text-ivory placeholder:text-ivory/25 focus:border-gold focus:outline-none"
                 />
               </div>
+              {errorMsg && <p className="text-xs text-red-300 md:col-span-2">{errorMsg}</p>}
               <button
                 type="submit"
                 className="mt-6 border border-gold bg-gold py-4 text-[11px] font-semibold uppercase tracking-[0.3em] text-night transition-colors hover:bg-gold-soft md:col-span-2"
               >
-                Confirm Reservation
+                {t("reserve.submit")}
               </button>
             </form>
           )}
